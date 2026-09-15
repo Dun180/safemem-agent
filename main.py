@@ -1,16 +1,44 @@
-# This is a sample Python script.
+from collections.abc import Callable
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+from agent import run_agent
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+def run_cli(
+    input_fn: Callable[[str], str] = input,
+    output_fn: Callable[[str], None] = print,
+) -> None:
+    output_fn("SafeMem Agent")
+    output_fn("-------------")
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    while True:
+        try:
+            user_input = input_fn("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            output_fn("\nBye!")
+            break
+
+        if user_input.lower() in {"exit", "quit"}:
+            output_fn("Bye!")
+            break
+
+        if not user_input:
+            continue
+
+        result = run_agent(user_input)
+
+        for event in result.tool_events:
+            output_fn(
+                f"Tool: {event.name}({event.arguments})"
+            )
+            output_fn(
+                f"Result: {event.result}"
+            )
+
+        output_fn(
+            f"Agent: {result.answer}"
+        )
+        output_fn("")
+
+
+if __name__ == "__main__":
+    run_cli()
