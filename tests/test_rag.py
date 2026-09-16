@@ -1,7 +1,7 @@
 import pytest
 
 from rag import chunk_text
-
+from rag import load_documents
 
 def test_chunk_text_creates_overlapping_chunks():
     text = "abcdefghij"
@@ -53,3 +53,35 @@ def test_chunk_text_rejects_overlap_not_smaller_than_chunk_size():
             chunk_size=4,
             overlap=4,
         )
+
+def test_load_documents_reads_only_md_and_txt(tmp_path):
+    (tmp_path / "a.md").write_text(
+        "alpha",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "b.txt").write_text(
+        "beta",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "ignored.json").write_text(
+        '{"x": 1}',
+        encoding="utf-8",
+    )
+
+    chunks = load_documents(
+        tmp_path,
+        chunk_size=100,
+        overlap=0,
+    )
+
+    assert [chunk.source for chunk in chunks] == [
+        "a.md",
+        "b.txt",
+    ]
+
+    assert [chunk.text for chunk in chunks] == [
+        "alpha",
+        "beta",
+    ]

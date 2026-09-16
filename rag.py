@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+from pathlib import Path
 
 @dataclass
 class DocumentChunk:
@@ -51,5 +51,33 @@ def chunk_text(
 
         if start + chunk_size >= len(text):
             break
+
+    return chunks
+
+def load_documents(
+    directory: str | Path,
+    chunk_size: int = 500,
+    overlap: int = 100,
+) -> list[DocumentChunk]:
+    directory = Path(directory)
+
+    chunks: list[DocumentChunk] = []
+
+    for path in sorted(directory.iterdir()):
+        if path.suffix.lower() not in {".md", ".txt"}:
+            continue
+
+        text = path.read_text(
+            encoding="utf-8",
+        )
+
+        chunks.extend(
+            chunk_text(
+                text=text,
+                source=path.name,
+                chunk_size=chunk_size,
+                overlap=overlap,
+            )
+        )
 
     return chunks
