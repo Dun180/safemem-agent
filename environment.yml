@@ -9,3 +9,5 @@ dependencies:
   - pytest
   - pip:
       - ollama
+      - langgraph
+      - numpy

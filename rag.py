@@ -1,5 +1,10 @@
 from dataclasses import dataclass
 from pathlib import Path
+import numpy as np
+from embedding_client import (
+    embed_text,
+    embed_texts,
+)
 
 @dataclass
 class DocumentChunk:
@@ -7,6 +12,15 @@ class DocumentChunk:
     source: str
     chunk_id: int
 
+@dataclass
+class EmbeddedChunk:
+    chunk: DocumentChunk
+    embedding: list[float]
+
+@dataclass
+class RetrievalResult:
+    chunk: DocumentChunk
+    score: float
 
 def chunk_text(
     text: str,
@@ -81,3 +95,87 @@ def load_documents(
         )
 
     return chunks
+
+def cosine_similarity(
+    a: list[float],
+    b: list[float],
+) -> float:
+    a_array = np.asarray(
+        a,
+        dtype=float,
+    )
+
+    b_array = np.asarray(
+        b,
+        dtype=float,
+    )
+
+    denominator = (
+        np.linalg.norm(a_array)
+        * np.linalg.norm(b_array)
+    )
+
+    if denominator == 0:
+        return 0.0
+
+    return float(
+        np.dot(a_array, b_array)
+        / denominator
+    )
+
+def build_index(
+    chunks: list[DocumentChunk],
+    embed_fn=embed_texts,
+) -> list[EmbeddedChunk]:
+    if not chunks:
+        return []
+
+    embeddings = embed_fn(
+        [chunk.text for chunk in chunks]
+    )
+
+    return [
+        EmbeddedChunk(
+            chunk=chunk,
+            embedding=embedding,
+        )
+        for chunk, embedding in zip(
+            chunks,
+            embeddings,
+            strict=True,
+        )
+    ]
+
+def retrieve(
+    query: str,
+    index: list[EmbeddedChunk],
+    top_k: int = 3,
+    embed_fn=embed_text,
+) -> list[RetrievalResult]:
+    if top_k <= 0:
+        raise ValueError(
+            "top_k must be greater than zero"
+        )
+
+    if not index:
+        return []
+
+    query_embedding = embed_fn(query)
+
+    results = [
+        RetrievalResult(
+            chunk=item.chunk,
+            score=cosine_similarity(
+                query_embedding,
+                item.embedding,
+            ),
+        )
+        for item in index
+    ]
+
+    results.sort(
+        key=lambda item: item.score,
+        reverse=True,
+    )
+
+    return results[:top_k]

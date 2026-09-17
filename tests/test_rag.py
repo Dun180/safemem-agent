@@ -2,7 +2,16 @@ import pytest
 
 from rag import chunk_text
 from rag import load_documents
-
+from rag import cosine_similarity
+from rag import (
+    DocumentChunk,
+    build_index,
+)
+from rag import (
+    DocumentChunk,
+    EmbeddedChunk,
+    retrieve,
+)
 def test_chunk_text_creates_overlapping_chunks():
     text = "abcdefghij"
 
@@ -85,3 +94,88 @@ def test_load_documents_reads_only_md_and_txt(tmp_path):
         "alpha",
         "beta",
     ]
+
+
+def test_cosine_similarity_identical_vectors_is_one():
+    score = cosine_similarity(
+        [1.0, 2.0],
+        [1.0, 2.0],
+    )
+
+    assert score == pytest.approx(1.0)
+
+def test_build_index_embeds_chunks_in_one_batch():
+    chunks = [
+        DocumentChunk(
+            text="alpha",
+            source="a.md",
+            chunk_id=0,
+        ),
+        DocumentChunk(
+            text="beta",
+            source="b.md",
+            chunk_id=0,
+        ),
+    ]
+
+    calls = []
+
+    def fake_embed_texts(texts):
+        calls.append(texts)
+
+        return [
+            [1.0, 0.0],
+            [0.0, 1.0],
+        ]
+
+    index = build_index(
+        chunks,
+        embed_fn=fake_embed_texts,
+    )
+
+    assert calls == [
+        ["alpha", "beta"]
+    ]
+
+    assert index[0].embedding == [
+        1.0,
+        0.0,
+    ]
+
+    assert index[1].embedding == [
+        0.0,
+        1.0,
+    ]
+
+def test_retrieve_returns_most_similar_chunks_first():
+    index = [
+        EmbeddedChunk(
+            chunk=DocumentChunk(
+                text="Aurora launches in October.",
+                source="project.md",
+                chunk_id=0,
+            ),
+            embedding=[1.0, 0.0],
+        ),
+        EmbeddedChunk(
+            chunk=DocumentChunk(
+                text="The team likes coffee.",
+                source="team.txt",
+                chunk_id=0,
+            ),
+            embedding=[0.0, 1.0],
+        ),
+    ]
+
+    results = retrieve(
+        query="When does Aurora launch?",
+        index=index,
+        top_k=1,
+        embed_fn=lambda _: [1.0, 0.0],
+    )
+
+    assert len(results) == 1
+
+    assert results[0].chunk.source == "project.md"
+
+    assert results[0].score == pytest.approx(1.0)
