@@ -1,0 +1,5 @@
+The SafeMem research team holds its weekly engineering meeting on Tuesday.
+
+The team uses local language models for reproducible experiments.
+
+The preferred test environment is Windows with Ollama.
