@@ -6,16 +6,13 @@ from rag import cosine_similarity
 from rag import (
     DocumentChunk,
     build_index,
-)
-from rag import (
     EmbeddedChunk,
     retrieve,
-)
-
-
-from rag import (
     RetrievalResult,
     answer_from_context,
+    RAGResult,
+    RetrievalResult,
+    run_rag,
 )
 
 from types import SimpleNamespace
@@ -247,4 +244,70 @@ def test_answer_from_context_with_no_results_returns_insufficient_information():
     assert answer == (
         "I don't have enough information "
         "in the retrieved documents."
+    )
+
+def test_run_rag_retrieves_then_answers():
+    expected_results = [
+        RetrievalResult(
+            chunk=DocumentChunk(
+                text="Aurora launches on 15 October.",
+                source="project_notes.md",
+                chunk_id=0,
+            ),
+            score=0.9,
+        )
+    ]
+
+    calls = []
+
+    def fake_retrieve(
+        query,
+        index,
+        top_k,
+    ):
+        calls.append(
+            (
+                "retrieve",
+                query,
+                top_k,
+            )
+        )
+
+        return expected_results
+
+    def fake_answer(
+        question,
+        results,
+    ):
+        calls.append(
+            (
+                "answer",
+                question,
+                results,
+            )
+        )
+
+        return "15 October"
+
+    result = run_rag(
+        question="When does Aurora launch?",
+        index=[],
+        top_k=3,
+        retrieve_fn=fake_retrieve,
+        answer_fn=fake_answer,
+    )
+
+    assert isinstance(
+        result,
+        RAGResult,
+    )
+
+    assert result.answer == "15 October"
+
+    assert result.retrieved == expected_results
+
+    assert calls[0] == (
+        "retrieve",
+        "When does Aurora launch?",
+        3,
     )

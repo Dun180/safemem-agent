@@ -23,6 +23,11 @@ class RetrievalResult:
     chunk: DocumentChunk
     score: float
 
+@dataclass
+class RAGResult:
+    answer: str
+    retrieved: list[RetrievalResult]
+
 RAG_SYSTEM_PROMPT = """
 You are a retrieval-grounded assistant.
 
@@ -239,3 +244,26 @@ def answer_from_context(
     )
 
     return response.message.content
+
+def run_rag(
+    question: str,
+    index: list[EmbeddedChunk],
+    top_k: int = 3,
+    retrieve_fn=retrieve,
+    answer_fn=answer_from_context,
+) -> RAGResult:
+    retrieved = retrieve_fn(
+        question,
+        index,
+        top_k,
+    )
+
+    answer = answer_fn(
+        question,
+        retrieved,
+    )
+
+    return RAGResult(
+        answer=answer,
+        retrieved=retrieved,
+    )
