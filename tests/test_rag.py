@@ -8,10 +8,17 @@ from rag import (
     build_index,
 )
 from rag import (
-    DocumentChunk,
     EmbeddedChunk,
     retrieve,
 )
+
+
+from rag import (
+    RetrievalResult,
+    answer_from_context,
+)
+
+from types import SimpleNamespace
 def test_chunk_text_creates_overlapping_chunks():
     text = "abcdefghij"
 
@@ -179,3 +186,65 @@ def test_retrieve_returns_most_similar_chunks_first():
     assert results[0].chunk.source == "project.md"
 
     assert results[0].score == pytest.approx(1.0)
+
+def test_answer_from_context_passes_retrieved_evidence_to_model():
+    captured = {}
+
+    def fake_chat(messages, tools):
+        captured["messages"] = messages
+        captured["tools"] = tools
+
+        return SimpleNamespace(
+            message=SimpleNamespace(
+                content="15 October",
+            )
+        )
+
+    results = [
+        RetrievalResult(
+            chunk=DocumentChunk(
+                text="Project Aurora launches on 15 October.",
+                source="project_notes.md",
+                chunk_id=0,
+            ),
+            score=0.91,
+        )
+    ]
+
+    answer = answer_from_context(
+        question="When does Project Aurora launch?",
+        results=results,
+        chat_fn=fake_chat,
+    )
+
+    assert answer == "15 October"
+
+    assert captured["tools"] == []
+
+    prompt_text = str(
+        captured["messages"]
+    )
+
+    assert (
+        "Project Aurora launches on 15 October."
+        in prompt_text
+    )
+
+    assert "project_notes.md" in prompt_text
+
+    assert (
+        "only the retrieved context"
+        in prompt_text
+    )
+
+def test_answer_from_context_with_no_results_returns_insufficient_information():
+    answer = answer_from_context(
+        question="Who leads Project Aurora?",
+        results=[],
+        chat_fn=lambda messages, tools: None,
+    )
+
+    assert answer == (
+        "I don't have enough information "
+        "in the retrieved documents."
+    )

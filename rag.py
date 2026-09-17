@@ -5,6 +5,7 @@ from embedding_client import (
     embed_text,
     embed_texts,
 )
+from ollama_client import chat_with_model
 
 @dataclass
 class DocumentChunk:
@@ -21,6 +22,18 @@ class EmbeddedChunk:
 class RetrievalResult:
     chunk: DocumentChunk
     score: float
+
+RAG_SYSTEM_PROMPT = """
+You are a retrieval-grounded assistant.
+
+Answer the user's question using only the retrieved context provided to you.
+Do not use outside knowledge.
+
+If the retrieved context does not contain enough information to answer,
+say exactly:
+
+I don't have enough information in the retrieved documents.
+""".strip()
 
 def chunk_text(
     text: str,
@@ -179,3 +192,50 @@ def retrieve(
     )
 
     return results[:top_k]
+
+def answer_from_context(
+    question: str,
+    results: list[RetrievalResult],
+    chat_fn=chat_with_model,
+) -> str:
+
+    if not results:
+        return (
+            "I don't have enough information "
+            "in the retrieved documents."
+        )
+
+    context_parts = []
+
+    for result in results:
+        context_parts.append(
+            f"[Source: {result.chunk.source}, "
+            f"chunk: {result.chunk.chunk_id}]\n"
+            f"{result.chunk.text}"
+        )
+
+    context = "\n\n".join(
+        context_parts
+    )
+
+    messages = [
+        {
+            "role": "system",
+            "content": RAG_SYSTEM_PROMPT,
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Retrieved context:\n\n"
+                f"{context}\n\n"
+                f"Question: {question}"
+            ),
+        },
+    ]
+
+    response = chat_fn(
+        messages=messages,
+        tools=[],
+    )
+
+    return response.message.content
